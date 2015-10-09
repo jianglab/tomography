@@ -48,7 +48,8 @@ from matplotlib.backends.backend_pdf import PdfPages
 def main():
 	progname = os.path.basename(sys.argv[0])
 	usage = """
-        Use 2D tilt series to determine the thickness, sample tilt and mean free path of sample from tomographic tilt series based on the Beer Lambert law
+        Determine the thickness, sample tilt and mean free path of tomographic tilt series
+	
 	Example:
 
 	python tomoThickness.py --tiltseries 6hSINVc1s2_17.ali --tiltangles 6hSINVc1s2_17.tlt --boxsize 200 --gain 8 --MFP 200  --B 1600 --d0 200 --theta0 5 --alpha0 0 --I0 40000 --niter 200 --interval 50  --x0 1200,1400,1000,2400,2900,2600,1400,800 --y0 1100,1400,2000,3600,2900,600,2800,2400 
@@ -132,7 +133,7 @@ def main():
 		r0 = Region(0, 0, k, nx, ny, 1)
 		tiltedImg = EMData(options.tiltseries, 0, 0, r0)	
 		blockMeanList = []
-		
+            
 		for i in range(len(x0)):
 			testname = options.tiltseries.split('.')[0]+'_x0%g_y0%g_clip.hdf'%(x0[i], y0[i])
 			
