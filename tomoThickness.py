@@ -128,32 +128,32 @@ def main():
 	
 	origDictionary = collections.OrderedDict()
         for k in range(nslices):
-            angle = float(tiltangles[k])
-	    r0 = Region(0, 0, k, nx, ny, 1)
-	    tiltedImg = EMData(options.tiltseries, 0, 0, r0)	
-	    blockMeanList = []
-            
-	    for i in range(len(x0)):
-                testname = options.tiltseries.split('.')[0]+'_x0%g_y0%g_clip.hdf'%(x0[i], y0[i])
-                
-		xp = (x0[i] - nx/2.0) * math.cos(math.radians(angle)) + nx/2.0
-		yp = y0[i]		
-                
-		if (options.adaptiveBox):
-		    boxsizeX = int(boxsize * math.cos(math.radians(angle)))
-		else:
-		    boxsizeX = boxsize
+		angle = float(tiltangles[k])
+		r0 = Region(0, 0, k, nx, ny, 1)
+		tiltedImg = EMData(options.tiltseries, 0, 0, r0)	
+		blockMeanList = []
+		
+		for i in range(len(x0)):
+			testname = options.tiltseries.split('.')[0]+'_x0%g_y0%g_clip.hdf'%(x0[i], y0[i])
+			
+			xp = (x0[i] - nx/2.0) * math.cos(math.radians(angle)) + nx/2.0
+			yp = y0[i]		
+			
+			if (options.adaptiveBox):
+			    boxsizeX = int(boxsize * math.cos(math.radians(angle)))
+			else:
+			    boxsizeX = boxsize
+						
+			#extract the whole image at each tilt
+			xp = xp-boxsizeX/2
+			yp = yp-boxsize/2
+			r = Region(xp, yp, boxsizeX, boxsize) 
+			img = tiltedImg.get_clip(r)
 					
-		#extract the whole image at each tilt
-		xp = xp-boxsizeX/2
-		yp = yp-boxsize/2
-		r = Region(xp, yp, boxsizeX, boxsize) 
-		img = tiltedImg.get_clip(r)
-				
-		if (options.writeClippedRegions): img.write_image(testname, k)
-				
-		blockMeanValues = blockMean(img, boxsizeX, boxsize)
-		blockMeanList.append(blockMeanValues)
+			if (options.writeClippedRegions): img.write_image(testname, k)
+					
+			blockMeanValues = blockMean(img, boxsizeX, boxsize)
+			blockMeanList.append(blockMeanValues)
 		origDictionary[tiltangles[k]] = flattenList(blockMeanList)
 		
 	#if (options.verbose>=10): print origDictionary
