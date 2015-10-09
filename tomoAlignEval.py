@@ -53,7 +53,7 @@ import matplotlib.cm as cm
 def main():
 	progname = os.path.basename(sys.argv[0])
 	usage = """
-	A indicator of the alignment of tomography tilt series, it can process *.st, *.preali and *.ali simultaneously and compare them.
+	An indicator of the alignment of tomography tilt series, it can process *.st, *.preali and *.ali simultaneously and compare them.
 	This program calculates the mean of all regions first, and then fit the linear relationship.
 	Example:
 	python tomoAlignment7.py --alltiltseries 6hSINV-sec4_50_rotIMOD.st,6hSINV-sec4_50_rotIMOD.preali,6hSINV-sec4_50_2.ali --alltiltangles 6hSINV-sec4_50.rawtlt,6hSINV-sec4_50.rawtlt,6hSINV-sec4_50_2.tlt --startZ 0 --endZ 60 --x0 450,650,1050,1250,1650,2250,2650,2850,3050,3450 --y0 1250,450,1650,3450,1450,3050,1050,450,850,450 --boxsize 100 --regionsize 100 --verbose 0 --fitLinear --errorsDistribution --FSCfile FSCeo_bin2_6hSINV-sec4_50.csv 
