@@ -231,8 +231,8 @@ def main():
             I0, d0, theta0, alpha0, A, B, MFP = tmp[0], tmp[1], tmp[2], tmp[3], tmp[4], tmp[5], tmp[6]
 	    #I0, d0, theta0, alpha0, B, MFP = tmp[0], tmp[1], tmp[2], tmp[3], tmp[4], tmp[5]
             gamma0 = calculateGamma0(theta0, alpha0)
-	    #print "[I0, d0, theta0, alpha0, A, B, MFP, gamma0] =", I0, d0, theta0, alpha0, A, B, MFP, gamma0
-	    #print "B/I0 = ", B/I0
+	    print "[I0, d0, theta0, alpha0, A, B, MFP, gamma0] =", I0, d0, theta0, alpha0, A, B, MFP, gamma0
+	    print "B/I0 = ", B/I0
 	    print "***************************************************"
 	    print "Tilt series: %s"%options.tiltseries
 	    print "Fitting results:"
@@ -733,9 +733,9 @@ class MyTakeStep3(object):
         x = np.float64(x)
         x[0] += np.random.uniform(-1000.*s, 1000.*s)
         x[1] += np.random.uniform(-10.*s, 10.*s)
-        x[2] += np.random.uniform(-1.*s, 1.*s)
-        x[3] += np.random.uniform(-1.*s, 1.*s)
-        x[4] += np.random.uniform(-100.*s, 100.*s)
+        x[2] += np.random.uniform(-s, s)
+        x[3] += np.random.uniform(-s, s)
+        x[4] += np.random.uniform(-10.*s, 10.*s)
         x[5] += np.random.uniform(-100.*s, 100.*s)
         x[6] += np.random.uniform(-10.*s, 10.*s)
 
