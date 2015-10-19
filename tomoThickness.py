@@ -52,9 +52,9 @@ def main():
 	
 	Example:
 
-	python tomoThickness.py --tiltseries 6hSINVc1s2_17.ali --tiltangles 6hSINVc1s2_17.tlt --boxsize 200 --gain 8 --MFP 200  --B 1600 --d0 200 --theta0 5 --alpha0 0 --I0 40000 --niter 200 --interval 50  --x0 1200,1400,1000,2400,2900,2600,1400,800 --y0 1100,1400,2000,3600,2900,600,2800,2400 
+	python tomoThickness.py --tiltseries 6hSINVc1s2_17.ali --tiltangles 6hSINVc1s2_17.tlt --boxsize 200 --MFP 200 --B 1600 --d0 200 --theta0 5 --alpha0 0  --niter 200 --interval 50  --x0 1200,1400,1000,2400,2900,2600,1400,800 --y0 1100,1400,2000,3600,2900,600,2800,2400
         
-	python tomoThickness.py --tiltseries virusJAN15000.ali --tiltangles virusJAN15000.tlt  --boxsize 100 --MFP 350 --gain 10 --B 480 --I0 2820 --d0 100 --alpha0 10 --theta0 0 --niter 200  --x0 1100,1200,1150,1050 --y0 200,300,250,350
+	python tomoThickness.py --tiltseries virus009.ali --tiltangles virus009.tlt --boxsize 200 --B 240 --d0 100 --alpha0 0 --theta0 0 --niter 400 --interval 50 --x0 1600,1500,1600,300 --y0 1600,1700,1800,300
 	"""
                 
 	parser = EMArgumentParser(usage=usage,version=EMANVERSION)
@@ -66,15 +66,16 @@ def main():
         parser.add_argument("--y0", type=str, default=0, help="for test on some regions, multiple regions are allowed, --y0 100,200,300")
         parser.add_argument("--adaptiveBox", action="store_true", default=False, help="squeeze the x side of boxsize by cos(theta(tlt))")
         parser.add_argument("--writeClippedRegions", action="store_true", default=False, help="write out the clipped region of interest, test only")
-        
-	parser.add_argument("--I0", type=float, default=2000, help="whole spectrum I0")
+        #try to determine I0 from the intercept of the graph
+	#parser.add_argument("--I0", type=float, default=2000, help="whole spectrum I0")
         parser.add_argument("--d0", type=float, default=100, help="initial thickness")
         parser.add_argument("--theta0", type=float, default=0, help="offset of angle theta (the initial offset angle around y-axis)")
 	parser.add_argument("--alpha0", type=float, default=0, help="offset of angle alpha (the initial offset angle around x-axis)")
-	parser.add_argument("--gain", type=float, default=20, help="# of electrons = gain * pixel_value")
+	#assume A == 1
+	parser.add_argument("--A", type=float, default=1, help="scaling factor of I0")
         parser.add_argument("--B", type=float, default=0, help="# of electrons = gain * pixel_value + B")
         parser.add_argument("--MFP", type=float, default=350, help="mean free path, for vitreous ice, 350nm@300kV, 300nm@200kV")
-        parser.add_argument("--k", type=float, default=0, help="I0(theta) = I0/(cos(theta)**k), and 0=<k<=1")	
+        #parser.add_argument("--k", type=float, default=0, help="I0(theta) = I0/(cos(theta)**k), and 0=<k<=1")	
 	
         parser.add_argument("--addOffset", type=str, default='-32000', help="Add options.addOffset to pixel values")
         #parser.add_argument("--inversePixel", action="store_true", default=False, help="inverse pixel values")
@@ -104,7 +105,7 @@ def main():
 	nslices = serieshdr['nz']
 	nx = serieshdr['nx']
 	ny = serieshdr['ny']
-	print "tiltseries %s: %d*%d*%d"%(options.tiltseries, nx, ny, nslices)
+	print "\ntiltseries %s: %d*%d*%d"%(options.tiltseries, nx, ny, nslices)
         
 	#read in tilt angles file, *.tlt
         anglesfile = open(options.tiltangles,'r') #Open tilt angles file
@@ -184,6 +185,13 @@ def main():
         #dictionary = averageRescaledResultDict(rescaledResultDict, options)
         dictionary = dictionary0
         
+	#use intercept as the initial value of I0 and set gain (A) == 1
+	thetaCurve, IntensityCurve, thetaLinear, IntensityLinear = generateData2(dictionary, options)
+	oneResultDict = fitLinearRegression3(thetaLinear, IntensityLinear, tiltanglesArray, thetaCurve, IntensityCurve, options)
+	I0 = calculateIntercept(oneResultDict, options)
+	print "initial I0 =", I0
+	#options.I0 = I0
+	
         global maxVal, minVal
         maxKey, maxVal = max(dictionary.iteritems(), key=lambda x:x[1])
         maxVal = maxVal[0]
@@ -194,22 +202,26 @@ def main():
 	
 	if (options.mode == 0): #use complete model, use multiple regions
             print "Using complete model and %g boxes!"%len(x0)
-            I0 = options.I0
+            #I0 = options.I0
 	    d0 = options.d0
 	    theta0 = options.theta0
 	    alpha0 = options.alpha0
-	    A = options.gain
+	    A = options.A
 	    B = options.B
 	    MFP = options.MFP
 	    niter = options.niter
 	    interval = options.interval
 	    p0 = [I0, d0, theta0, alpha0, A, B, MFP]
+	    #p0 = [I0, d0, theta0, alpha0, B, MFP]
 	    x0 = p0
             boundsList = [(maxVal, None),(10, 250), (-10, 10), (-10, 10), (0.01, None), (None, int(minVal)), (1, None)]
+	    #boundsList = [(maxVal, None),(10, 250), (-10, 10), (-10, 10), (None, int(minVal)), (1, None)]
             minimizer_kwargs = dict(method="L-BFGS-B", bounds=boundsList)
             mybounds = MyBounds()
             mybounds.xmax=[float('inf'), 250.0, 10.0, 10.0, float('inf'), int(minVal), float('inf')]
 	    mybounds.xmin=[maxVal, 10.0, -10.0, -10.0, 0.01, (-1)*(float('inf')), 1.0]
+	    #mybounds.xmax=[float('inf'), 250.0, 10.0, 10.0, int(minVal), float('inf')]
+	    #mybounds.xmin=[maxVal, 10.0, -10.0, -10.0, (-1)*(float('inf')), 1.0]
 	    mytakestep = MyTakeStep3()
 	    res = scipy.optimize.basinhopping(optimizationFuncFullModel0, x0, T=options.T, stepsize=0.01, minimizer_kwargs=minimizer_kwargs, niter=niter, take_step=mytakestep, accept_test=mybounds, \
 					   callback=None, interval=interval, disp=False, niter_success=None)
@@ -217,14 +229,26 @@ def main():
 	    tmp = res.x.tolist()
             #tmp[1] = tmp[1]+100
             I0, d0, theta0, alpha0, A, B, MFP = tmp[0], tmp[1], tmp[2], tmp[3], tmp[4], tmp[5], tmp[6]
+	    #I0, d0, theta0, alpha0, B, MFP = tmp[0], tmp[1], tmp[2], tmp[3], tmp[4], tmp[5]
             gamma0 = calculateGamma0(theta0, alpha0)
 	    #print "[I0, d0, theta0, alpha0, A, B, MFP, gamma0] =", I0, d0, theta0, alpha0, A, B, MFP, gamma0
+	    #print "B/I0 = ", B/I0
 	    print "***************************************************"
 	    print "Tilt series: %s"%options.tiltseries
 	    print "Fitting results:"
 	    print "Thickness = %g nm"%d0
 	    print "Sample tilt: theta0 = %g degree, alpha0 = %g degree, gamma0 = %g degree"%(theta0, alpha0, gamma0)
 	    print "Mean free path = %g nm"%MFP
+	    
+	    logName = options.tiltseries.split(".")[0] + ".log"
+	    fp = open(logName, 'w')
+	    fp.write("Tilt series: %s\n"%options.tiltseries)
+	    fp.write("Fitting results:\n")
+	    fp.write("Thickness = %g nm\n"%d0)
+	    fp.write("Sample tilt: theta0 = %g degree, alpha0 = %g degree, gamma0 = %g degree\n"%(theta0, alpha0, gamma0))
+	    fp.write("Mean free path = %g nm\n"%MFP)
+	    fp.close()
+
             if (options.plotResults):
 		compareFitData(dictionary, tmp, options)
 	    
@@ -240,6 +264,144 @@ def main():
 			line = "%g\n"%(tlt)
 			fp.write(line)
 		fp.close()
+
+
+def calculateIntercept(oneResultDict, options):
+	interceptLeftArray = np.array([])
+	interceptRightArray = np.array([])
+	
+	for boxPosition, value in oneResultDict.iteritems():
+		interceptLeftArray = np.append(interceptLeftArray, value['interceptLeft'])
+		interceptRightArray = np.append(interceptRightArray, value['interceptRight'])
+	
+	interceptArray = np.append(interceptLeftArray, interceptRightArray)
+	interceptMedian = np.median(interceptArray)
+	#print interceptArray
+	initialI0 = exp(interceptMedian)
+	
+	return initialI0
+
+
+def fitLinearRegression3(thetaLinear, IntensityLinear, tiltanglesArray, thetaCurve, IntensityCurve, options):
+	x0 = [int(x) for x in options.x0.split(',')]
+	y0 = [int(y) for y in options.y0.split(',')]
+	
+	resultDict = collections.OrderedDict()
+	#returnDict = collections.OrderedDict()
+	
+	allResLeft = []
+	allResRight = []
+	for i in range(len(x0)):
+		iIntensityLinear = IntensityLinear[:, i]
+		iIntensityCurve = IntensityCurve[:, i]
+		key = '%g %g'%(x0[i], y0[i])
+		#print "x0, y0 =", key
+		
+		ret = fitOneLinearRegression(thetaLinear, iIntensityLinear, tiltanglesArray, options)
+		fres, stdRes, xLeft, yLeft, fitLeft, xRight, yRight, fitRight, indexLargeLeft, indexLargeRight, indexSmallLeft, indexSmallRight, resLeft, resRight, slopeLeft, interceptLeft, slopeRight, interceptRight = ret
+		resultDict[key] = {}
+		resultDict[key]['SSE'] = fres
+		resultDict[key]['intensityCurve'] = iIntensityCurve
+		resultDict[key]['tiltAngles'] = thetaCurve
+		resultDict[key]['stdRes'] = stdRes
+		resultDict[key]['xLeft'] = xLeft
+		resultDict[key]['yLeft'] = yLeft
+		resultDict[key]['fitLeft'] = fitLeft
+		resultDict[key]['xRight'] = xRight
+		resultDict[key]['yRight'] = yRight
+		resultDict[key]['fitRight'] = fitRight
+		resultDict[key]['indexLargeLeft'] = indexLargeLeft
+		resultDict[key]['indexLargeRight'] = indexLargeRight
+		resultDict[key]['indexSmallLeft'] = indexSmallLeft
+		resultDict[key]['indexSmallRight'] = indexSmallRight
+		resultDict[key]['resLeft'] = resLeft
+		resultDict[key]['resRight'] = resRight
+		resultDict[key]['slopeLeft'] = slopeLeft
+		resultDict[key]['interceptLeft'] = interceptLeft
+		resultDict[key]['slopeRight'] = slopeRight
+		resultDict[key]['interceptRight'] = interceptRight
+
+	return resultDict
+
+
+def fitOneLinearRegression(thetaLinear, IntensityLinear, tiltanglesArray, options):
+	if (len(tiltanglesArray)%2 == 1):
+		halfN = int(len(tiltanglesArray)/2) + 1
+		xLeft, yLeft = thetaLinear[0:halfN], IntensityLinear[0:halfN]
+		xRight, yRight = thetaLinear[halfN-1:], IntensityLinear[halfN-1:]
+		
+	else:
+		halfN = int(len(tiltanglesArray)/2)
+		xLeft, yLeft = thetaLinear[0:halfN], IntensityLinear[0:halfN]
+		xRight, yRight = thetaLinear[halfN:], IntensityLinear[halfN:]
+	
+	slopeLeft, interceptLeft, r2Left = linearRegression(xLeft, yLeft)
+        slopeRight, interceptRight, r2Right = linearRegression(xRight, yRight)
+	
+	assert(len(xLeft)==len(xRight))
+	
+	fitLeft = slopeLeft*xLeft + interceptLeft
+        fitRight = slopeRight*xRight + interceptRight
+        
+        #the sum of squared residuals
+        resLeft = yLeft - fitLeft
+	resLeft = resLeft / fitLeft
+	#print "resLeft", resLeft
+        resRight = yRight - fitRight
+	resRight = resRight / fitRight
+	#print "resRight", resRight
+	
+	fresLeft = sum(resLeft**2)
+        fresRight = sum(resRight**2)
+	fres = [fresLeft*1000000, fresRight*1000000]
+
+	#find the points with the largest 3 residuals in left and right branches, use numpy.argpartition
+	#N = options.largestNRes
+	N=3
+        negN = (-1)*N
+        indexLargeLeft = np.argpartition(resLeft**2, negN)[negN:]
+        indexLargeRight = np.argpartition(resRight**2, negN)[negN:]
+	
+	M=3
+	#M = options.smallestNRes
+	posM = M
+	indexSmallLeft = np.argpartition(resLeft**2, posM)[:posM]
+	indexSmallRight = np.argpartition(resRight**2, posM)[:posM]
+	
+        #MSE, under the assumption that the population error term has a constant variance, the estimate of that variance is given by MSE, mean square error
+        #The denominator is the sample size reduced by the number of model parameters estimated from the same data, (n-p) for p regressors or (n-p-1) if an intercept is used.
+        #In this case, p=1 so the denominator is n-2.
+        stdResLeft = np.std(resLeft, ddof=2)
+        stdResRight = np.std(resRight, ddof=2)
+	stdRes = [stdResLeft*1000, stdResRight*1000]
+	ret = fres, stdRes, xLeft, yLeft, fitLeft, xRight, yRight, fitRight, indexLargeLeft, indexLargeRight, indexSmallLeft, indexSmallRight, resLeft, resRight, slopeLeft, interceptLeft, slopeRight, interceptRight
+	return ret
+
+def linearRegression(x, y):
+        slope, intercept, r_value, p_value, std_err = stats.linregress(x,y)
+        # To get slope, intercept and coefficient of determination (r_squared)
+        return slope, intercept, r_value**2
+
+
+def generateData2(dictionary, options):
+	x0 = [int(x) for x in options.x0.split(',')]
+	thetaLst = []
+        intensityLst = []
+        thetaLinearLst = []
+	
+	for theta, intensity in dictionary.iteritems():
+		thetaLst.append(float(theta))
+		intensityLst.append(intensity)
+		cosAngle = math.cos((float(theta)/360.)*math.pi*2)
+		tmp = (1./(cosAngle))
+		thetaLinearLst.append(tmp)
+		
+	thetaArray = np.asarray(thetaLst)
+	thetaLinearArray = np.asarray(thetaLinearLst)	
+	intensityArray = np.asarray(intensityLst)
+	intensityLinearArray = np.log(intensityArray)	
+
+	return thetaArray, intensityArray, thetaLinearArray, intensityLinearArray
 
 
 def plotOriginalData(dictionary, options):
@@ -516,39 +678,40 @@ def calculateGamma0(theta0, alpha0):
         return gamma0
 
 def optimizationFuncFullModel0(x): # use complete model
-    I0, d0, theta0, alpha0, A, B, MFP = x
+	I0, d0, theta0, alpha0, A, B, MFP = x
+	#I0, d0, theta0, alpha0, B, MFP = x
+	#A = 1
+	cosTheta0 = math.cos((theta0/360.)*math.pi*2)
+	cosAlpha0 = math.cos((alpha0/360.)*math.pi*2)
+	tanTheta0 = math.tan((theta0/360.)*math.pi*2)
+	tanAlpha0 = math.tan((alpha0/360.)*math.pi*2)
+	#tmp = 1./(cosTheta0 * cosTheta0 * cosAlpha0 * cosAlpha0) - tanTheta0 * tanTheta0 * tanAlpha0 * tanAlpha0
+	
+	tmp = tanTheta0 * tanTheta0 + tanAlpha0 * tanAlpha0 + 1
+	cosGamma0 = math.pow(tmp, -0.5)
+	
+	func = 0
+	n = 0
     
-    cosTheta0 = math.cos((theta0/360.)*math.pi*2)
-    cosAlpha0 = math.cos((alpha0/360.)*math.pi*2)
-    tanTheta0 = math.tan((theta0/360.)*math.pi*2)
-    tanAlpha0 = math.tan((alpha0/360.)*math.pi*2)
-    #tmp = 1./(cosTheta0 * cosTheta0 * cosAlpha0 * cosAlpha0) - tanTheta0 * tanTheta0 * tanAlpha0 * tanAlpha0
+	for theta, intensity in dictionary.iteritems():
+	    for i in range(len(intensity)):
+		
+		A = math.fabs(A)
+		I0 = math.fabs(I0)
+		intensityExit = math.log(A * (intensity[i] - B)) 
+		intensityIn = math.log(I0)
     
-    tmp = tanTheta0 * tanTheta0 + tanAlpha0 * tanAlpha0 + 1
-    cosGamma0 = math.pow(tmp, -0.5)
-    
-    func = 0
-    n = 0
-
-    for theta, intensity in dictionary.iteritems():
-        for i in range(len(intensity)):
-            
-            A = math.fabs(A)
-            I0 = math.fabs(I0)
-            intensityExit = math.log(A * (intensity[i] - B)) 
-            intensityIn = math.log(I0)
-
-            theta_i = float(theta) + theta0
-            cosTheta = math.cos((theta_i/360.)*math.pi*2)
-            #cosAlpha = math.cos((alpha0/360.)*math.pi*2)
-            #err =  intensityIn  - (1./(MFP * cosTheta * cosAlpha)) * d0 - intensityExit
-	    err =  intensityIn  - (1./(MFP * cosTheta * cosGamma0)) * d0 * cosTheta0 - intensityExit
-            func += err * err
-            n+=1
-    
-    func = func/n  
-  
-    return func
+		theta_i = float(theta) + theta0
+		cosTheta = math.cos((theta_i/360.)*math.pi*2)
+		#cosAlpha = math.cos((alpha0/360.)*math.pi*2)
+		#err =  intensityIn  - (1./(MFP * cosTheta * cosAlpha)) * d0 - intensityExit
+		err =  intensityIn  - (1./(MFP * cosTheta * cosGamma0)) * d0 * cosTheta0 - intensityExit
+		func += err * err
+		n+=1
+	
+	func = func/n  
+      
+	return func
 
 class MyBounds(object):
     def __init__(self, xmax = [], xmin = []):
@@ -570,9 +733,9 @@ class MyTakeStep3(object):
         x = np.float64(x)
         x[0] += np.random.uniform(-1000.*s, 1000.*s)
         x[1] += np.random.uniform(-10.*s, 10.*s)
-        x[2] += np.random.uniform(-s, s)
-        x[3] += np.random.uniform(-s, s)
-        x[4] += np.random.uniform(-10.*s, 10.*s)
+        x[2] += np.random.uniform(-1.*s, 1.*s)
+        x[3] += np.random.uniform(-1.*s, 1.*s)
+        x[4] += np.random.uniform(-100.*s, 100.*s)
         x[5] += np.random.uniform(-100.*s, 100.*s)
         x[6] += np.random.uniform(-10.*s, 10.*s)
 
@@ -612,11 +775,11 @@ def oneBlockMean(img):
 
 	if (blkMean < 0):
 		blkMean = blkMean * (-1)   #average pixel values must be positive
-                
+               
         if (blkMean > 30000):
                 offset = float(options.addOffset)
                 blkMean = blkMean + offset
-
+	
 	return blkMean
     
 def reject_outliers(data, m=2):
