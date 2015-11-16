@@ -91,6 +91,7 @@ def main():
 	parser.add_argument("--modifyTiltFile", action="store_true", default=False, help="modify the .tlt file by returned theta0")
 	parser.add_argument('--modifiedTiltName',type=str,default='',help='the filename of modified tilt angles')
 	#parser.add_argument("--refineRegion", action="store_true", default=False, help="use returned theta0 to re-clip region and re-do optimization")
+	parser.add_argument('--logName',type=str,default='',help='the name of the log file which contains the output')
         
         parser.add_argument("--verbose", "-v", dest="verbose", action="store", metavar="n", type=int, default=0, help="verbose level, higner number means higher level of verboseness")
 	parser.add_argument("--ppid", type=int, help="Set the PID of the parent process, used for cross platform PPID",default=-1)
@@ -240,7 +241,11 @@ def main():
 	    print "Sample tilt: theta0 = %g degree, alpha0 = %g degree, gamma0 = %g degree"%(theta0, alpha0, gamma0)
 	    print "Mean free path = %g nm"%MFP
 	    
-	    logName = options.tiltseries.split(".")[0] + ".log"
+	    if (options.logName):
+		logName = options.logName
+	    else:
+		logName = options.tiltseries.split(".")[0] + ".log"
+		
 	    fp = open(logName, 'w')
 	    fp.write("Tilt series: %s\n"%options.tiltseries)
 	    fp.write("Fitting results:\n")
@@ -256,7 +261,7 @@ def main():
 		if (options.modifiedTiltName):
 			tiltFile = options.modifiedTiltName
 		else:
-			tiltFile = options.tiltseries.split(".")[0] + "_modifiedFullModel.tlt"
+			tiltFile = options.tiltseries.split(".")[0] + "_modified.tlt"
 		fp = open(tiltFile, 'w')
 		for i in tiltangles:
 			tlt = float(i) + theta0
