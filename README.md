@@ -1,7 +1,13 @@
 # tomography
 software for alignment and 3-D reconstruction of electron tomography tilt series
 
-# tomoThickness.py
+This project includes the Python scripts reported in these papers:
+
+Yan, R., Edwards, T. J., Pankratz, L. M., Kuhn, R. J., Lanman, J. K., Liu, J., & Jiang, W. (2015a). **A fast cross-validation method for alignment of electron tomography images based on Beer-Lambert law.** Journal of Structural Biology, 192(2), 297–306. https://doi.org/10.1016/j.jsb.2015.10.004
+
+Yan, R., Edwards, T. J., Pankratz, L. M., Kuhn, R. J., Lanman, J. K., Liu, J., & Jiang, W. (2015b). **Simultaneous determination of sample thickness, tilt, and electron mean free path using tomographic tilt images based on Beer-Lambert law.** Journal of Structural Biology, 192(2), 287–296. https://doi.org/10.1016/j.jsb.2015.09.019
+
+### tomoThickness.py
 This file is an instruction of *tomoThickness.py* which is used to simultaneously determine the sample thickness, sample tilt and mean free path.
 
 Example: python tomoThickness.py --tiltseries virus009.ali --tiltangles virus009.tlt --x0 1600,1500,1600,300 --y0 1600,1700,1800,300 --boxsize 200 --B 240 --d0 100 --alpha0 0 --theta0 0 --niter 400 --plotData --plotResults --modifyTiltFile --modifiedTiltName modifiedTilt.tlt --logName myLog.log
